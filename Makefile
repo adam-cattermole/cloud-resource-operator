@@ -110,6 +110,10 @@ cluster/seed/workshop/blobstorage:
 cluster/seed/managed/blobstorage:
 	@cat config/samples/integreatly_v1alpha1_blobstorage.yaml | sed "s/type: REPLACE_ME/type: managed/g" | oc apply -f - -n $(NAMESPACE)
 
+.PHONY: cluster/seed/gcp/blobstorage
+cluster/seed/gcp/blobstorage:
+	@cat config/samples/integreatly_v1alpha1_blobstorage.yaml | sed "s/type: REPLACE_ME/type: gcp/g" | oc apply -f - -n $(NAMESPACE)
+
 .PHONY: cluster/seed/workshop/redis
 cluster/seed/workshop/redis:
 	@cat config/samples/integreatly_v1alpha1_redis.yaml | sed "s/type: REPLACE_ME/type: workshop/g" | oc apply -f - -n $(NAMESPACE)
@@ -118,6 +122,10 @@ cluster/seed/workshop/redis:
 cluster/seed/managed/redis:
 	@cat config/samples/integreatly_v1alpha1_redis.yaml | sed "s/type: REPLACE_ME/type: managed/g" | oc apply -f - -n $(NAMESPACE)
 
+.PHONY: cluster/seed/gcp/redis
+cluster/seed/gcp/redis:
+	@cat config/samples/integreatly_v1alpha1_redis.yaml | sed "s/type: REPLACE_ME/type: gcp/g" | oc apply -f - -n $(NAMESPACE)
+
 .PHONY: cluster/seed/workshop/postgres
 cluster/seed/workshop/postgres:
 	@cat config/samples/integreatly_v1alpha1_postgres.yaml | sed "s/type: REPLACE_ME/type: workshop/g" | oc apply -f - -n $(NAMESPACE)
@@ -125,6 +133,10 @@ cluster/seed/workshop/postgres:
 .PHONY: cluster/seed/managed/postgres
 cluster/seed/managed/postgres:
 	@cat config/samples/integreatly_v1alpha1_postgres.yaml | sed "s/type: REPLACE_ME/type: managed/g" | oc apply -f - -n $(NAMESPACE)
+
+.PHONY: cluster/seed/gcp/postgres
+cluster/seed/gcp/postgres:
+	@cat config/samples/integreatly_v1alpha1_postgres.yaml | sed "s/type: REPLACE_ME/type: gcp/g" | oc apply -f - -n $(NAMESPACE)
 
 .PHONY: cluster/clean
 cluster/clean:
