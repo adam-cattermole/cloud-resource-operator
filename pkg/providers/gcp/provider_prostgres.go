@@ -3,6 +3,8 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1"
 	croType "github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1/types"
 	"github.com/integr8ly/cloud-resource-operator/pkg/annotations"
@@ -17,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 )
 
 var _ providers.PostgresProvider = (*PostgresProvider)(nil)
@@ -257,11 +258,11 @@ func (p PostgresProvider) getCloudSQLConfig(ctx context.Context, postgresCR *v1a
 
 	if instanceName == "" {
 		// TODO - Don't be too random
-		name, err := resources.GeneratePassword()
+		uuid, err := resources.GeneratePassword()
 		if err != nil {
 			return nil, err
 		}
-		instanceName = name
+		instanceName = fmt.Sprintf("%s-%s", postgresCR.Name, uuid)
 	}
 
 	return &sqladmin.DatabaseInstance{
