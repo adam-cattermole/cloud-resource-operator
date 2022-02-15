@@ -3,8 +3,9 @@ module github.com/integr8ly/cloud-resource-operator
 go 1.17
 
 require (
-	cloud.google.com/go/compute v0.1.0
+	cloud.google.com/go/compute v1.2.0
 	cloud.google.com/go/redis v1.2.0
+	cloud.google.com/go/storage v1.16.0
 	github.com/aws/aws-sdk-go v1.39.2
 	github.com/coreos/prometheus-operator v0.38.1-0.20200424145508-7e176fda06cc
 	github.com/google/uuid v1.2.0
@@ -19,8 +20,8 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
-	google.golang.org/api v0.66.0
-	google.golang.org/genproto v0.0.0-20220208230804-65c12eb4c068
+	google.golang.org/api v0.68.0
+	google.golang.org/genproto v0.0.0-20220212005935-8e8603a66f83
 	k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.2
@@ -31,6 +32,7 @@ require (
 
 require (
 	cloud.google.com/go v0.100.2 // indirect
+	cloud.google.com/go/iam v0.1.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect

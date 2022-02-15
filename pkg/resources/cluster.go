@@ -39,6 +39,28 @@ func GetAWSRegion(ctx context.Context, c client.Client) (string, error) {
 	return "", errorUtil.New("infrastructure does not container aws region")
 }
 
+func GetGCPRegion(ctx context.Context, c client.Client) (string, error) {
+	infra, err := GetClusterInfrastructure(ctx, c)
+	if err != nil {
+		return "", errorUtil.Wrapf(err, "failure happened while retrieving cluster infrastructure")
+	}
+	if infra.Status.PlatformStatus.Type == v1.GCPPlatformType {
+		return infra.Status.PlatformStatus.GCP.Region, nil
+	}
+	return "", errorUtil.New("infrastructure does not contain gcp region")
+}
+
+func GetGCPProjectID(ctx context.Context, c client.Client) (string, error) {
+	infra, err := GetClusterInfrastructure(ctx, c)
+	if err != nil {
+		return "", errorUtil.Wrapf(err, "failure happened while retrieving cluster infrastructure")
+	}
+	if infra.Status.PlatformStatus.Type == v1.GCPPlatformType {
+		return infra.Status.PlatformStatus.GCP.ProjectID, nil
+	}
+	return "", errorUtil.New("infrastructure does not contain gcp region")
+}
+
 func GetClusterInfrastructure(ctx context.Context, c client.Client) (*v1.Infrastructure, error) {
 	infra := &v1.Infrastructure{}
 	if err := c.Get(ctx, types.NamespacedName{Name: "cluster"}, infra); err != nil {

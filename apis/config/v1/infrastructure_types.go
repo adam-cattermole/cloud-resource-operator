@@ -114,12 +114,24 @@ type PlatformStatus struct {
 	// AWS contains settings specific to the Amazon Web Services infrastructure provider.
 	// +optional
 	AWS *AWSPlatformStatus `json:"aws,omitempty"`
+
+	// GCP contains settings specific to the Google Cloud Platform infrastructure provider.
+	// +optional
+	GCP *GCPPlatformStatus `json:"gcp,omitempty"`
 }
 
 // AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.
 type AWSPlatformStatus struct {
 	// region holds the default AWS region for new AWS resources created by the cluster.
 	Region string `json:"region"`
+}
+
+// GCPPlatformStatus holds the current status of the Google Cloud Platform infrastructure provider.
+type GCPPlatformStatus struct {
+	// region holds the region for new GCP resources created for the cluster.
+	Region string `json:"region"`
+	// projectId is the Project ID for new GCP resources created for the cluster.
+	ProjectID string `json:"projectID"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
