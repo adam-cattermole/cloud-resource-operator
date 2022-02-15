@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -103,7 +104,12 @@ func (p *BlobStorageProvider) CreateStorage(ctx context.Context, bs *v1alpha1.Bl
 		return nil, msg, errorUtil.Wrapf(err, string(msg))
 	}
 
-	// TODO: reconcile tags / labels to gcp bucket
+	// Adding labels to gcp
+	msg, err = p.TagBlobStorage(ctx, bs, gcpClient, gcpConfig)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to add labels to bucket: %s", msg)
+		return nil, croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
+	}
 
 	bsi := &providers.BlobStorageInstance{
 		DeploymentDetails: &BlobStorageDeploymentDetails{
@@ -112,7 +118,9 @@ func (p *BlobStorageProvider) CreateStorage(ctx context.Context, bs *v1alpha1.Bl
 			BucketProjectID: stratCfg.ProjectID,
 		},
 	}
-	return bsi, croType.StatusEmpty, nil
+
+	p.Logger.Infof("creation handler for blob storage instance %s in namespace %s finished successfully", bs.Name, bs.Namespace)
+	return bsi, msg, nil
 }
 
 func (p *BlobStorageProvider) reconcileBucketCreate(ctx context.Context, bs *v1alpha1.BlobStorage, gcpClient *storage.Client, gcpConfig *storage.BucketAttrs, stratConfig *StrategyConfig) (croType.StatusMessage, error) {
@@ -160,6 +168,37 @@ func (p *BlobStorageProvider) reconcileBucketCreate(ctx context.Context, bs *v1a
 
 	p.Logger.Infof("reconcile for gcp bucket completed successfully")
 	return "successfully reconciled", nil
+}
+
+func (p *BlobStorageProvider) TagBlobStorage(ctx context.Context, bs *v1alpha1.BlobStorage, gcpClient *storage.Client, gcpConfig *storage.BucketAttrs) (croType.StatusMessage, error) {
+	p.Logger.Infof("bucket %s found, Adding labels to bucket", gcpConfig.Name)
+
+	// set tag values that will always be added
+	defaultOrganizationTag := resources.GetOrganizationTagGcp()
+
+	clusterID, err := resources.GetClusterID(ctx, p.Client)
+	if err != nil {
+		errMsg := "failed to get cluster id"
+		return croType.StatusMessage(errMsg), errorUtil.Wrapf(err, errMsg)
+	}
+
+	attrs := &storage.BucketAttrsToUpdate{}
+	attrs.SetLabel(defaultOrganizationTag+"clusterid", clusterID)
+	attrs.SetLabel(defaultOrganizationTag+"resource-type", bs.Spec.Type)
+	attrs.SetLabel(defaultOrganizationTag+"resource-name", bs.Name)
+
+	if bs.ObjectMeta.Labels["productName"] != "" {
+		attrs.SetLabel(defaultOrganizationTag+"product-name", strings.ToLower(bs.ObjectMeta.Labels["productName"]))
+	}
+
+	_, err = gcpClient.Bucket(gcpConfig.Name).Update(ctx, *attrs)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to add labels to gcp bucket: %s", err)
+		return croType.StatusMessage(errMsg), errorUtil.Wrapf(err, errMsg)
+	}
+
+	logrus.Infof("successfully created or updated labels on gcp bucket %s", gcpConfig.Name)
+	return "successfully created and tagged", nil
 }
 
 func (p *BlobStorageProvider) DeleteStorage(ctx context.Context, bs *v1alpha1.BlobStorage) (croType.StatusMessage, error) {

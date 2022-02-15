@@ -15,6 +15,7 @@ const (
 	EnvForceReconcileTimeout   = "ENV_FORCE_RECONCILE_TIMEOUT"
 	EnvMetricsReconcileTimeout = "ENV_METRIC_RECONCILE_TIMEOUT"
 	DefaultTagKeyPrefix        = "integreatly.org/"
+	DefaultTagKeyPrefixGcp     = "integreatly-org_"
 	// Set the reconcile duration for this controller.
 	// Currently it will be called once every 5 minutes
 	MetricsWatchDuration = 5 * time.Minute
@@ -59,6 +60,14 @@ func GetOrganizationTag() string {
 	organizationTag, exists := os.LookupEnv("TAG_KEY_PREFIX")
 	if !exists {
 		organizationTag = DefaultTagKeyPrefix
+	}
+	return organizationTag
+}
+
+func GetOrganizationTagGcp() string {
+	organizationTag, exists := os.LookupEnv("TAG_KEY_PREFIX")
+	if !exists {
+		organizationTag = DefaultTagKeyPrefixGcp
 	}
 	return organizationTag
 }
