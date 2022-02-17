@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 
 	"github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1"
 	croType "github.com/integr8ly/cloud-resource-operator/apis/integreatly/v1alpha1/types"
@@ -45,16 +46,18 @@ func (d *BlobStorageDeploymentDetails) Data() map[string][]byte {
 var _ providers.BlobStorageProvider = (*BlobStorageProvider)(nil)
 
 type BlobStorageProvider struct {
-	Client        client.Client
-	Logger        *logrus.Entry
-	ConfigManager ConfigManager
+	Client            client.Client
+	Logger            *logrus.Entry
+	CredentialManager CredentialManager
+	ConfigManager     ConfigManager
 }
 
 func NewGCPBlobStorageProvider(client client.Client, logger *logrus.Entry) *BlobStorageProvider {
 	return &BlobStorageProvider{
-		Client:        client,
-		Logger:        logger.WithFields(logrus.Fields{"provider": blobstorageProviderName}),
-		ConfigManager: NewDefaultConfigMapConfigManager(client),
+		Client:            client,
+		Logger:            logger.WithFields(logrus.Fields{"provider": blobstorageProviderName}),
+		CredentialManager: NewCredentialMinterCredentialManager(client),
+		ConfigManager:     NewDefaultConfigMapConfigManager(client),
 	}
 }
 
@@ -87,15 +90,21 @@ func (p *BlobStorageProvider) CreateStorage(ctx context.Context, bs *v1alpha1.Bl
 		return nil, croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
 	}
 
-	// TODO: build and extract credentials to use for gcp client
+	// TODO: create the credentials to be used by the end-user, whoever created the blobstorage instance
 
-	gcpClient, err := storage.NewClient(ctx)
+	// create the credentials to be used by the gcp resource providers, not to be used by end-user
+	p.Logger.Infof("creating provider credentials for creating gcp buckets, in namespace %s", bs.Namespace)
+	providerCreds, err := p.CredentialManager.ReconcileProviderCredentials(ctx, bs.Namespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to reconcile gcp blob storage provider credentials for blob storage instance %s", bs.Name)
+		return nil, croType.StatusMessage(errMsg), errorUtil.Wrapf(err, errMsg)
+	}
+
+	gcpClient, err := storage.NewClient(ctx, option.WithCredentialsJSON(providerCreds.ServiceAccountJson))
 	if err != nil {
 		errMsg := "failed to create gcp client to create bucket"
 		return nil, croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
 	}
-
-	defer gcpClient.Close()
 
 	// create bucket if it doesn't already exist, if it does exist then use the existing bucket
 	p.Logger.Infof("reconciling gcp bucket %s", gcpConfig.Name)
@@ -152,7 +161,7 @@ func (p *BlobStorageProvider) reconcileBucketCreate(ctx context.Context, bs *v1a
 
 	// create bucket
 	p.Logger.Infof("bucket %s not found, creating bucket", gcpConfig.Name)
-	if err = bkt.Create(ctx, stratConfig.ProjectID, nil); err != nil {
+	if err = bkt.Create(ctx, stratConfig.ProjectID, gcpConfig); err != nil {
 		errMsg := fmt.Sprintf("failed to create gcp bucket %s", gcpConfig.Name)
 		return croType.StatusMessage(errMsg), errorUtil.Wrapf(err, errMsg)
 	}
@@ -212,15 +221,19 @@ func (p *BlobStorageProvider) DeleteStorage(ctx context.Context, bs *v1alpha1.Bl
 		return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
 	}
 
-	// TODO: get credentials for client for deletion
+	// create the credentials to be used by the gcp resource providers, not to be used by end-user
+	p.Logger.Infof("creating provider credentials for creating gcp buckets, in namespace %s", bs.Namespace)
+	providerCreds, err := p.CredentialManager.ReconcileProviderCredentials(ctx, bs.Namespace)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to reconcile gcp blob storage provider credentials for blob storage instance %s", bs.Name)
+		return croType.StatusMessage(errMsg), errorUtil.Wrapf(err, errMsg)
+	}
 
-	gcpClient, err := storage.NewClient(ctx)
+	gcpClient, err := storage.NewClient(ctx, option.WithCredentialsJSON(providerCreds.ServiceAccountJson))
 	if err != nil {
 		errMsg := "failed to create gcp client to delete bucket"
 		return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
 	}
-
-	defer gcpClient.Close()
 
 	return p.reconcileBucketDelete(ctx, bs, gcpClient, gcpConfig, stratCfg)
 }
@@ -236,6 +249,8 @@ func (p *BlobStorageProvider) reconcileBucketDelete(ctx context.Context, bs *v1a
 	}
 
 	if attrs == nil {
+		// TODO: remove end user credentials also
+
 		resources.RemoveFinalizer(&bs.ObjectMeta, DefaultFinalizer)
 		if err = p.Client.Update(ctx, bs); err != nil {
 			return croType.StatusMessage("failed to update blob storage cr as part of finalizer reconcile"), err
@@ -313,6 +328,7 @@ func (p *BlobStorageProvider) getGcpBucketConfig(ctx context.Context, bs *v1alph
 	if err = json.Unmarshal(stratCfg.RawStrategy, gcpConfig); err != nil {
 		return nil, nil, errorUtil.Wrapf(err, "failed to unmarshal gcp strategy configuration")
 	}
+	gcpConfig.Location = stratCfg.Region
 
 	return gcpConfig, stratCfg, nil
 }
