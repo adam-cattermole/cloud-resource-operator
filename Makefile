@@ -12,7 +12,8 @@ UPGRADE ?= true
 CHANNEL ?= rhmi
 REDIS_NODE_SIZE ?= ""
 REDIS_NAME ?= example-redis
-PROVIDER ?= openshift # openshift/aws/gcp
+# openshift/aws/gcp
+PROVIDER ?= openshift
 
 SHELL=/bin/bash
 
