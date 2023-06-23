@@ -2050,6 +2050,8 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 		r        *v1alpha1.Redis
 		stratCfg StrategyConfig
 		cache    *elasticache.NodeGroupMember
+		replicationGroup *elasticache.ReplicationGroup
+		elasticacheConfig        *elasticache.CreateReplicationGroupInput
 	}
 	tests := []struct {
 		name    string
@@ -2228,7 +2230,19 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 				ConfigManager:     tt.fields.ConfigManager,
 				CacheSvc:          tt.fields.CacheSvc,
 			}
-			got, err := p.TagElasticacheNode(tt.args.ctx, tt.args.cacheSvc, tt.args.stsSvc, tt.args.r, tt.args.cache)
+			rgs, err := getReplicationGroups(tt.args.cacheSvc)
+			if err != nil {
+				// return nil error so this function can be requeueed
+				t.Errorf("getReplicationGroups() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for _, c := range rgs {
+				if *c.ReplicationGroupId == *tt.args.elasticacheConfig.ReplicationGroupId {
+					tt.args.replicationGroup = c
+					break
+				}
+			}
+			got, err := p.TagElasticacheReplicationGroup(tt.args.ctx, tt.args.cacheSvc, tt.args.stsSvc, tt.args.r, tt.args.replicationGroup)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TagElasticache() error = %v, wantErr %v", err, tt.wantErr)
 				return
