@@ -2044,14 +2044,14 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 		CacheSvc          elasticacheiface.ElastiCacheAPI
 	}
 	type args struct {
-		ctx      context.Context
-		cacheSvc elasticacheiface.ElastiCacheAPI
-		stsSvc   stsiface.STSAPI
-		r        *v1alpha1.Redis
-		stratCfg StrategyConfig
-		cache    *elasticache.NodeGroupMember
-		replicationGroup *elasticache.ReplicationGroup
-		elasticacheConfig        *elasticache.CreateReplicationGroupInput
+		ctx               context.Context
+		cacheSvc          elasticacheiface.ElastiCacheAPI
+		stsSvc            stsiface.STSAPI
+		r                 *v1alpha1.Redis
+		stratCfg          StrategyConfig
+		cache             *elasticache.NodeGroupMember
+		replicationGroup  *elasticache.ReplicationGroup
+		elasticacheConfig *elasticache.CreateReplicationGroupInput
 	}
 	tests := []struct {
 		name    string
@@ -2066,11 +2066,6 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 				ctx: context.TODO(),
 				r:   buildTestRedisCR(),
 				cacheSvc: buildMockElasticacheClient(func(elasticacheClient *mockElasticacheClient) {
-					elasticacheClient.describeCacheClustersFn = func(input *elasticache.DescribeCacheClustersInput) (*elasticache.DescribeCacheClustersOutput, error) {
-						return &elasticache.DescribeCacheClustersOutput{
-							CacheClusters: buildCacheClusterList(nil),
-						}, nil
-					}
 					elasticacheClient.describeSnapshotsFn = func(input *elasticache.DescribeSnapshotsInput) (*elasticache.DescribeSnapshotsOutput, error) {
 						return &elasticache.DescribeSnapshotsOutput{
 							Snapshots: []*elasticache.Snapshot{
@@ -2091,6 +2086,28 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 					CacheNodeId:               aws.String("test"),
 					PreferredAvailabilityZone: aws.String("test"),
 				},
+				replicationGroup: buildReplicationGroup(func(group *elasticache.ReplicationGroup) {
+					group.ReplicationGroupId = aws.String("test-id")
+					group.Status = aws.String("available")
+					group.CacheNodeType = aws.String("test")
+					group.SnapshotRetentionLimit = aws.Int64(20)
+					group.NodeGroups = []*elasticache.NodeGroup{
+						{
+							NodeGroupId: aws.String("primary-node"),
+							NodeGroupMembers: []*elasticache.NodeGroupMember{
+								{
+									PreferredAvailabilityZone: aws.String("eu-west"),
+								},
+							},
+							PrimaryEndpoint: &elasticache.Endpoint{
+								Address: testAddress,
+								Port:    testPort,
+							},
+							Status: aws.String("available"),
+						},
+					}
+				},
+				),
 			},
 			fields: fields{
 				Client:            moqClient.NewSigsClientMoqWithScheme(scheme, buildTestRedisCR(), builtTestCredSecret(), buildTestInfra()),
@@ -2230,18 +2247,18 @@ func TestAWSRedisProvider_TagElasticache(t *testing.T) {
 				ConfigManager:     tt.fields.ConfigManager,
 				CacheSvc:          tt.fields.CacheSvc,
 			}
-			rgs, err := getReplicationGroups(tt.args.cacheSvc)
-			if err != nil {
-				// return nil error so this function can be requeueed
-				t.Errorf("getReplicationGroups() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			for _, c := range rgs {
-				if *c.ReplicationGroupId == *tt.args.elasticacheConfig.ReplicationGroupId {
-					tt.args.replicationGroup = c
-					break
-				}
-			}
+			// rgs, err := getReplicationGroups(tt.args.cacheSvc)
+			// if err != nil {
+			// 	// return nil error so this function can be requeueed
+			// 	t.Errorf("getReplicationGroups() error = %v, wantErr %v", err, tt.wantErr)
+			// 	return
+			// }
+			// for _, c := range rgs {
+			// 	if *c.ReplicationGroupId == *tt.args.elasticacheConfig.ReplicationGroupId {
+			// 		tt.args.replicationGroup = c
+			// 		break
+			// 	}
+			// }
 			got, err := p.TagElasticacheReplicationGroup(tt.args.ctx, tt.args.cacheSvc, tt.args.stsSvc, tt.args.r, tt.args.replicationGroup)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TagElasticache() error = %v, wantErr %v", err, tt.wantErr)

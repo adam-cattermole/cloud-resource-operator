@@ -351,7 +351,6 @@ func (p *RedisProvider) createElasticacheCluster(ctx context.Context, r *v1alpha
 			return nil, croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
 		}
 	}
-	
 
 	primaryEndpoint := foundCache.NodeGroups[0].PrimaryEndpoint
 	rdd := &providers.RedisDeploymentDetails{
@@ -386,58 +385,57 @@ func (p *RedisProvider) buildRedisTagCreateStrategy(ctx context.Context, cr *v1a
 
 // TagElasticacheReplicationGroup Add Tags to AWS Elasticache Replication Group
 func (p *RedisProvider) TagElasticacheReplicationGroup(ctx context.Context, cacheSvc elasticacheiface.ElastiCacheAPI, stsSvc stsiface.STSAPI, r *v1alpha1.Redis, replicationGroup *elasticache.ReplicationGroup) (croType.StatusMessage, error) {
-    logrus.Info("creating or updating tags on elasticache replication groups")
+	logrus.Info("creating or updating tags on elasticache replication groups")
 
-    // check the replication group to make sure it is available before applying the tag
-    replicationGroupOutput, err := cacheSvc.DescribeReplicationGroups(&elasticache.DescribeReplicationGroupsInput{
-        ReplicationGroupId: replicationGroup.ReplicationGroupId,
-    })
-    if err != nil {
-        errMsg := "failed to get replication group output"
-        return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
-    }
-    replicationGroupStatus := *replicationGroupOutput.ReplicationGroups[0].Status
-    if replicationGroupStatus != "available" {
-        errMsg := fmt.Sprintf("%s status is %s, skipping adding tags", *replicationGroup.ReplicationGroupId, replicationGroupStatus)
-        return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
-    }
+	// check the replication group to make sure it is available before applying the tag
+	// replicationGroupOutput, err := cacheSvc.DescribeReplicationGroups(&elasticache.DescribeReplicationGroupsInput{
+	//     ReplicationGroupId: replicationGroup.ReplicationGroupId,
+	// })
+	// if err != nil {
+	//     errMsg := "failed to get replication group output"
+	//     return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
+	// }
+	replicationGroupStatus := *replicationGroup.Status
+	if replicationGroupStatus != "available" {
+		errMsg := fmt.Sprintf("%s status is %s, skipping adding tags", *replicationGroup.ReplicationGroupId, replicationGroupStatus)
+		return croType.StatusMessage(errMsg), nil
+	}
 
-    // get account identity
-    identityInput := &sts.GetCallerIdentityInput{}
-    id, err := stsSvc.GetCallerIdentity(identityInput)
-    if err != nil {
-        errMsg := "failed to get account identity"
-        return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
-    }
+	// get account identity
+	identityInput := &sts.GetCallerIdentityInput{}
+	id, err := stsSvc.GetCallerIdentity(identityInput)
+	if err != nil {
+		errMsg := "failed to get account identity"
+		return croType.StatusMessage(errMsg), errorUtil.Wrap(err, errMsg)
+	}
 
-    // trim availability zone to return member cluster region
+	// trim availability zone to return member cluster region
 	regionWithAZ := aws.StringValue(replicationGroup.NodeGroups[0].NodeGroupMembers[0].PreferredAvailabilityZone)
 	region := regionWithAZ[:len(regionWithAZ)-1] // remove last character (availability zone suffix)
 
-    // build replication group arn
-    // need arn in the following format arn:aws:elasticache:us-east-1:1234567890:replicationgroup:my-mem-replication-group
-    arn := fmt.Sprintf("arn:aws:elasticache:%s:%s:replicationgroup:%s", region, *id.Account, *replicationGroup.ReplicationGroupId)
+	// build replication group arn
+	// need arn in the following format arn:aws:elasticache:us-east-1:1234567890:replicationgroup:my-mem-replication-group
+	arn := fmt.Sprintf("arn:aws:elasticache:%s:%s:replicationgroup:%s", region, *id.Account, *replicationGroup.ReplicationGroupId)
 
-    cacheTags, _, err := p.getDefaultElasticacheTags(ctx, r)
-    if err != nil {
-        msg := "Failed to build default tags"
-        return croType.StatusMessage(msg), errorUtil.Wrapf(err, msg)
-    }
+	cacheTags, _, err := p.getDefaultElasticacheTags(ctx, r)
+	if err != nil {
+		msg := "Failed to build default tags"
+		return croType.StatusMessage(msg), errorUtil.Wrapf(err, msg)
+	}
 
-    // add tags
-    _, err = cacheSvc.AddTagsToResource(&elasticache.AddTagsToResourceInput{
-        ResourceName: aws.String(arn),
-        Tags:         cacheTags,
-    })
-    if err != nil {
-        msg := fmt.Sprintf("failed to add tags to AWS ElastiCache replication group %s: %s", arn, err.Error())
-        return croType.StatusMessage(msg), err
-    }
+	// add tags
+	_, err = cacheSvc.AddTagsToResource(&elasticache.AddTagsToResourceInput{
+		ResourceName: aws.String(arn),
+		Tags:         cacheTags,
+	})
+	if err != nil {
+		msg := fmt.Sprintf("failed to add tags to AWS ElastiCache replication group %s: %s", arn, err.Error())
+		return croType.StatusMessage(msg), err
+	}
 
-    logrus.Infof("successfully created or updated tags to elasticache replication group %s", *replicationGroup.ReplicationGroupId)
-    return "successfully created and tagged", nil
+	logrus.Infof("successfully created or updated tags to elasticache replication group %s", *replicationGroup.ReplicationGroupId)
+	return "successfully created and tagged", nil
 }
-
 
 func getMetricName(redisName string) string {
 	// Convention for CRs is - but _ for prom metrics
